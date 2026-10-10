@@ -1,0 +1,124 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ninja Jungle Adventure</title>
+<style>
+body {
+  margin: 0;
+  text-align: center;
+  background: #123b2b;
+  color: white;
+  font-family: Arial, sans-serif;
+}
+h1 { color: #ffe66d; }
+canvas {
+  background: linear-gradient(#7ed6df, #dff9fb);
+  width: 95%;
+  max-width: 600px;
+  border: 4px solid white;
+  border-radius: 12px;
+}
+button {
+  padding: 14px 20px;
+  margin: 5px;
+  font-size: 18px;
+  border: 0;
+  border-radius: 10px;
+  background: #ffe66d;
+}
+</style>
+</head>
+<body>
+<h1>🥷 Ninja Jungle Adventure</h1>
+<p>Collect coins and jump over obstacles!</p>
+<canvas id="game" width="600" height="300"></canvas>
+<div>
+<button id="left">⬅️</button>
+<button id="jump">⬆️ JUMP</button>
+<button id="right">➡️</button>
+<button onclick="resetGame()">🔄 Restart</button>
+</div>
+<p id="score">Coins: 0</p>
+<script>
+const c = document.getElementById("game");
+const ctx = c.getContext("2d");
+let ninja, coins, obstacles, score, keys, over;
+
+function resetGame() {
+  ninja = {x: 50, y: 220, vy: 0};
+  coins = [{x: 220, y: 190}, {x: 350, y: 150}, {x: 480, y: 200}];
+  obstacles = [{x: 300}, {x: 530}];
+  score = 0;
+  keys = {};
+  over = false;
+}
+function jump() {
+  if (ninja.y >= 219 && !over) ninja.vy = -12;
+}
+document.getElementById("jump").onclick = jump;
+document.getElementById("left").onpointerdown = () => keys.left = true;
+document.getElementById("left").onpointerup = () => keys.left = false;
+document.getElementById("right").onpointerdown = () => keys.right = true;
+document.getElementById("right").onpointerup = () => keys.right = false;
+document.onkeydown = e => {
+  if (e.key === "ArrowUp" || e.key === " ") jump();
+  if (e.key === "ArrowLeft") keys.left = true;
+  if (e.key === "ArrowRight") keys.right = true;
+};
+document.onkeyup = e => {
+  if (e.key === "ArrowLeft") keys.left = false;
+  if (e.key === "ArrowRight") keys.right = false;
+};
+function draw() {
+  ctx.clearRect(0, 0, 600, 300);
+  ctx.fillStyle = "#27864a";
+  ctx.fillRect(0, 250, 600, 50);
+  ctx.fillStyle = "#165b32";
+  for(let i=0;i<8;i++) {
+    ctx.beginPath();
+    ctx.arc(i*90+20, 45, 35, 0, Math.PI*2);
+    ctx.fill();
+  }
+  if (!over) {
+    if(keys.left) ninja.x -= 4;
+    if(keys.right) ninja.x += 4;
+    ninja.x = Math.max(0, Math.min(565, ninja.x));
+    ninja.y += ninja.vy;
+    ninja.vy += 0.6;
+    if(ninja.y > 220) {ninja.y=220; ninja.vy=0;}
+    coins.forEach((coin,i) => {
+      if(coin && Math.abs(ninja.x-coin.x)<25 &&
+         Math.abs(ninja.y-coin.y)<30) {
+        coins[i] = null; score++;
+      }
+    });
+    obstacles.forEach(o => {
+      o.x -= 2;
+      if(o.x < -20) o.x = 620;
+      if(Math.abs(ninja.x-o.x)<25 && ninja.y>195) over=true;
+    });
+  }
+  coins.forEach(coin => {
+    if(coin) {
+      ctx.fillStyle="#ffd32a";
+      ctx.beginPath();ctx.arc(coin.x,coin.y,10,0,Math.PI*2);ctx.fill();
+    }
+  });
+  obstacles.forEach(o => {
+    ctx.fillStyle="#633974";
+    ctx.fillRect(o.x,220,22,30);
+  });
+  ctx.font="28px Arial";
+  ctx.fillText("🥷", ninja.x, ninja.y+25);
+  document.getElementById("score").textContent =
+    "Coins: "+score+(over?" — Game Over! Press Restart":"");
+  requestAnimationFrame(draw);
+}
+resetGame();
+draw();
+</script>
+</body>
+</html>
