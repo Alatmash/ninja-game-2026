@@ -3,122 +3,389 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Ninja Jungle Adventure</title>
+<title>Ninja Jungle Adventure 2026</title>
 <style>
-body {
-  margin: 0;
-  text-align: center;
-  background: #123b2b;
-  color: white;
-  font-family: Arial, sans-serif;
-}
-h1 { color: #ffe66d; }
-canvas {
-  background: linear-gradient(#7ed6df, #dff9fb);
-  width: 95%;
-  max-width: 600px;
-  border: 4px solid white;
-  border-radius: 12px;
-}
-button {
-  padding: 14px 20px;
-  margin: 5px;
-  font-size: 18px;
-  border: 0;
-  border-radius: 10px;
-  background: #ffe66d;
-}
+*{box-sizing:border-box}
+body{margin:0;overflow:hidden;background:#061b12;font-family:Arial;color:white}
+#game{position:fixed;inset:0}
+#hud{position:fixed;top:10px;left:10px;right:10px;display:flex;justify-content:space-between;gap:8px;z-index:2;pointer-events:none}
+.panel{background:#071b14dd;border:1px solid #54e58b;border-radius:12px;padding:10px;font-weight:bold}
+#message{position:fixed;top:65px;left:0;right:0;text-align:center;color:#ffe66d;font-weight:bold;z-index:2}
+#controls{position:fixed;bottom:18px;left:0;right:0;display:flex;justify-content:space-between;align-items:end;padding:0 16px;z-index:3}
+.group{display:flex;gap:8px}
+button{width:65px;height:60px;border:2px solid #80ffad;border-radius:15px;background:#102b20dd;color:white;font-size:13px;font-weight:bold;touch-action:none}
+button:active{background:#b61d36}
+#attack{border-color:#ff5252;background:#661729e8}
+#jump{border-color:#ffe66d}
+#restart{width:auto;height:auto;padding:10px 16px;display:none}
 </style>
 </head>
 <body>
-<h1>🥷 Ninja Jungle Adventure</h1>
-<p>Collect coins and jump over obstacles!</p>
-<canvas id="game" width="600" height="300"></canvas>
-<div>
-<button id="left">⬅️</button>
-<button id="jump">⬆️ JUMP</button>
-<button id="right">➡️</button>
-<button onclick="resetGame()">🔄 Restart</button>
+<div id="game"></div>
+<div id="hud">
+  <div class="panel">🪙 Score: <span id="score">0</span></div>
+  <div class="panel">❤️ Health: <span id="health">100</span></div>
 </div>
-<p id="score">Coins: 0</p>
+<div id="message">NINJA JUNGLE ADVENTURE 3D</div>
+<div id="controls">
+  <div class="group">
+    <button id="left">◀ LEFT</button>
+    <button id="right">RIGHT ▶</button>
+  </div>
+  <div class="group">
+    <button id="jump">⬆ JUMP</button>
+    <button id="attack">⚔ ATTACK</button>
+  </div>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script>
-const c = document.getElementById("game");
-const ctx = c.getContext("2d");
-let ninja, coins, obstacles, score, keys, over;
+const game = document.getElementById("game");
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x87ceeb);
+scene.fog = new THREE.Fog(0x87ceeb, 25, 100);
 
-function resetGame() {
-  ninja = {x: 50, y: 220, vy: 0};
-  coins = [{x: 220, y: 190}, {x: 350, y: 150}, {x: 480, y: 200}];
-  obstacles = [{x: 300}, {x: 530}];
-  score = 0;
-  keys = {};
-  over = false;
-}
-function jump() {
-  if (ninja.y >= 219 && !over) ninja.vy = -12;
-}
-document.getElementById("jump").onclick = jump;
-document.getElementById("left").onpointerdown = () => keys.left = true;
-document.getElementById("left").onpointerup = () => keys.left = false;
-document.getElementById("right").onpointerdown = () => keys.right = true;
-document.getElementById("right").onpointerup = () => keys.right = false;
-document.onkeydown = e => {
-  if (e.key === "ArrowUp" || e.key === " ") jump();
-  if (e.key === "ArrowLeft") keys.left = true;
-  if (e.key === "ArrowRight") keys.right = true;
-};
-document.onkeyup = e => {
-  if (e.key === "ArrowLeft") keys.left = false;
-  if (e.key === "ArrowRight") keys.right = false;
-};
-function draw() {
-  ctx.clearRect(0, 0, 600, 300);
-  ctx.fillStyle = "#27864a";
-  ctx.fillRect(0, 250, 600, 50);
-  ctx.fillStyle = "#165b32";
-  for(let i=0;i<8;i++) {
-    ctx.beginPath();
-    ctx.arc(i*90+20, 45, 35, 0, Math.PI*2);
-    ctx.fill();
+const camera = new THREE.PerspectiveCamera(
+  65, innerWidth / innerHeight, 0.1, 200
+);
+const renderer = new THREE.WebGLRenderer({antialias:true});
+renderer.setSize(innerWidth, innerHeight);
+renderer.setPixelRatio(Math.min(devicePixelRatio, 1.7));
+renderer.shadowMap.enabled = true;
+game.appendChild(renderer.domElement);
+
+scene.add(new THREE.HemisphereLight(0xd9f5ff, 0x284523, 2));
+const sun = new THREE.DirectionalLight(0xffffff, 2);
+sun.position.set(-8, 15, 8);
+sun.castShadow = true;
+scene.add(sun);
+
+const mat = (color, extra={}) =>
+  new THREE.MeshStandardMaterial({color, ...extra});
+
+const green = mat(0x286b32);
+const trunkMat = mat(0x684126);
+const leafMat = mat(0x12552b);
+const dark = mat(0x10141c);
+const red = mat(0xe51c3d, {emissive:0x600010});
+const gold = mat(0xffd52a, {metalness:0.6, roughness:0.25});
+const eyeMat = mat(0xff1010, {emissive:0xff0000, emissiveIntensity:2});
+
+const ground = new THREE.Mesh(
+  new THREE.PlaneGeometry(200, 200),
+  mat(0x285b27)
+);
+ground.rotation.x = -Math.PI/2;
+ground.position.y = -0.08;
+ground.receiveShadow = true;
+scene.add(ground);
+
+// Jungle trees
+for(let i=0;i<90;i++){
+  const side = Math.random()<0.5 ? -1 : 1;
+  const x = side*(5+Math.random()*19);
+  const z = 8-Math.random()*115;
+  const h = 2.5+Math.random()*3.5;
+  const tree = new THREE.Group();
+
+  const trunk = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.22,0.4,h,7), trunkMat
+  );
+  trunk.position.y=h/2;
+  trunk.castShadow=true;
+  tree.add(trunk);
+
+  for(let j=0;j<3;j++){
+    const leaves = new THREE.Mesh(
+      new THREE.ConeGeometry(1.5-j*0.25,2.4,7), leafMat
+    );
+    leaves.position.y=h*0.65+j*0.8;
+    leaves.castShadow=true;
+    tree.add(leaves);
   }
-  if (!over) {
-    if(keys.left) ninja.x -= 4;
-    if(keys.right) ninja.x += 4;
-    ninja.x = Math.max(0, Math.min(565, ninja.x));
-    ninja.y += ninja.vy;
-    ninja.vy += 0.6;
-    if(ninja.y > 220) {ninja.y=220; ninja.vy=0;}
-    coins.forEach((coin,i) => {
-      if(coin && Math.abs(ninja.x-coin.x)<25 &&
-         Math.abs(ninja.y-coin.y)<30) {
-        coins[i] = null; score++;
-      }
-    });
-    obstacles.forEach(o => {
-      o.x -= 2;
-      if(o.x < -20) o.x = 620;
-      if(Math.abs(ninja.x-o.x)<25 && ninja.y>195) over=true;
-    });
+  tree.position.set(x,0,z);
+  scene.add(tree);
+}
+
+// Jungle path
+const path = new THREE.Mesh(
+  new THREE.PlaneGeometry(9,160),
+  mat(0x987448)
+);
+path.rotation.x=-Math.PI/2;
+path.position.set(0,-0.035,-45);
+scene.add(path);
+
+// Build the ninja
+const player = new THREE.Group();
+scene.add(player);
+
+const body = new THREE.Mesh(
+  new THREE.CylinderGeometry(0.32,0.42,1.05,8), dark
+);
+body.position.y=1.05;
+body.castShadow=true;
+player.add(body);
+
+const head = new THREE.Mesh(
+  new THREE.SphereGeometry(0.38,16,12), dark
+);
+head.position.y=1.85;
+head.castShadow=true;
+player.add(head);
+
+const face = new THREE.Mesh(
+  new THREE.BoxGeometry(0.48,0.12,0.08), dark
+);
+face.position.set(0,1.83,-0.32);
+player.add(face);
+
+for(const x of [-0.13,0.13]){
+  const eye=new THREE.Mesh(
+    new THREE.BoxGeometry(0.09,0.045,0.035),eyeMat
+  );
+  eye.position.set(x,1.88,-0.37);
+  player.add(eye);
+}
+
+const scarf = new THREE.Mesh(
+  new THREE.BoxGeometry(0.7,0.16,0.2),red
+);
+scarf.position.set(0,1.65,0.12);
+player.add(scarf);
+
+const tail = new THREE.Mesh(
+  new THREE.BoxGeometry(0.18,0.12,0.85),red
+);
+tail.position.set(0.28,1.62,0.65);
+tail.rotation.x=-0.15;
+player.add(tail);
+
+const limbs=[];
+for(const x of [-0.48,0.48]){
+  const arm=new THREE.Mesh(
+    new THREE.BoxGeometry(0.2,0.72,0.22),dark
+  );
+  arm.position.set(x,1.12,0);
+  player.add(arm);
+  limbs.push(arm);
+
+  const leg=new THREE.Mesh(
+    new THREE.BoxGeometry(0.25,0.65,0.28),dark
+  );
+  leg.position.set(x*0.65,0.38,0);
+  player.add(leg);
+  limbs.push(leg);
+}
+
+// Sword on ninja's back
+const sword=new THREE.Mesh(
+  new THREE.BoxGeometry(0.12,1.25,0.12),
+  mat(0xcbd8e5,{metalness:0.8,roughness:0.2})
+);
+sword.position.set(0.48,1.45,0.2);
+sword.rotation.z=-0.35;
+player.add(sword);
+
+player.position.set(0,0,3);
+
+// Coins
+const coins=[];
+for(let i=0;i<24;i++){
+  const coin=new THREE.Mesh(
+    new THREE.TorusGeometry(0.32,0.1,8,16),gold
+  );
+  coin.position.set((Math.random()-0.5)*6,0.9,-5-i*4);
+  coin.castShadow=true;
+  scene.add(coin);
+  coins.push(coin);
+}
+
+// Enemies
+const enemies=[];
+function makeEnemy(x,z){
+  const e=new THREE.Group();
+  const torso=new THREE.Mesh(
+    new THREE.BoxGeometry(0.8,1.1,0.55),mat(0x7d1828)
+  );
+  torso.position.y=1;
+  e.add(torso);
+
+  const h=new THREE.Mesh(
+    new THREE.SphereGeometry(0.34,12,10),mat(0x26202b)
+  );
+  h.position.y=1.8;
+  e.add(h);
+
+  const eyes=new THREE.Mesh(
+    new THREE.BoxGeometry(0.24,0.06,0.04),eyeMat
+  );
+  eyes.position.set(0,1.82,-0.31);
+  e.add(eyes);
+  e.position.set(x,0,z);
+  scene.add(e);
+  enemies.push({mesh:e,alive:true,hitCooldown:0});
+}
+for(let i=0;i<8;i++){
+  makeEnemy((Math.random()-0.5)*5,-13-i*10);
+}
+
+let score=0, health=100, vy=0, onGround=true;
+let attacking=0, gameOver=false;
+const keys={left:false,right:false,forward:false,back:false};
+
+function bindHold(id,key){
+  const b=document.getElementById(id);
+  b.addEventListener("pointerdown",e=>{
+    e.preventDefault(); keys[key]=true;
+    b.setPointerCapture(e.pointerId);
+  });
+  for(const ev of ["pointerup","pointercancel","lostpointercapture"]){
+    b.addEventListener(ev,()=>keys[key]=false);
   }
-  coins.forEach(coin => {
-    if(coin) {
-      ctx.fillStyle="#ffd32a";
-      ctx.beginPath();ctx.arc(coin.x,coin.y,10,0,Math.PI*2);ctx.fill();
+}
+bindHold("left","left");
+bindHold("right","right");
+
+document.getElementById("jump").addEventListener("pointerdown",e=>{
+  e.preventDefault();
+  if(onGround&&!gameOver){vy=7.5;onGround=false;}
+});
+document.getElementById("attack").addEventListener("pointerdown",e=>{
+  e.preventDefault();
+  if(gameOver)return;
+  attacking=0.35;
+  playSound(180,0.09);
+  for(const en of enemies){
+    if(!en.alive)continue;
+    const d=player.position.distanceTo(en.mesh.position);
+    if(d<2.7){
+      en.alive=false;
+      scene.remove(en.mesh);
+      score+=10;
+      document.getElementById("score").textContent=score;
+      playSound(600,0.12);
     }
-  });
-  obstacles.forEach(o => {
-    ctx.fillStyle="#633974";
-    ctx.fillRect(o.x,220,22,30);
-  });
-  ctx.font="28px Arial";
-  ctx.fillText("🥷", ninja.x, ninja.y+25);
-  document.getElementById("score").textContent =
-    "Coins: "+score+(over?" — Game Over! Press Restart":"");
-  requestAnimationFrame(draw);
+  }
+});
+
+addEventListener("keydown",e=>{
+  if(e.key==="ArrowLeft"||e.key==="a")keys.left=true;
+  if(e.key==="ArrowRight"||e.key==="d")keys.right=true;
+  if(e.key==="ArrowUp"||e.key==="w")keys.forward=true;
+  if(e.key==="ArrowDown"||e.key==="s")keys.back=true;
+  if(e.code==="Space"&&onGround&&!gameOver){vy=7.5;onGround=false;}
+  if(e.key==="x")document.getElementById("attack").dispatchEvent(
+    new Event("pointerdown")
+  );
+});
+addEventListener("keyup",e=>{
+  if(["ArrowLeft","a"].includes(e.key))keys.left=false;
+  if(["ArrowRight","d"].includes(e.key))keys.right=false;
+  if(["ArrowUp","w"].includes(e.key))keys.forward=false;
+  if(["ArrowDown","s"].includes(e.key))keys.back=false;
+});
+
+let audio;
+function playSound(freq,duration){
+  try{
+    audio=audio||new (window.AudioContext||window.webkitAudioContext)();
+    const osc=audio.createOscillator();
+    const gain=audio.createGain();
+    osc.frequency.value=freq;
+    gain.gain.value=0.06;
+    osc.connect(gain);gain.connect(audio.destination);
+    osc.start();gain.gain.exponentialRampToValueAtTime(
+      0.001,audio.currentTime+duration
+    );
+    osc.stop(audio.currentTime+duration);
+  }catch(e){}
 }
-resetGame();
-draw();
+
+function endGame(){
+  gameOver=true;
+  document.getElementById("message").textContent="GAME OVER — Refresh to play again";
+  document.getElementById("restart").style.display="block";
+}
+
+const restart=document.createElement("button");
+restart.id="restart";restart.textContent="RESTART";
+restart.style.cssText="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:5";
+restart.onclick=()=>location.reload();
+document.body.appendChild(restart);
+
+const clock=new THREE.Clock();
+function animate(){
+  requestAnimationFrame(animate);
+  const dt=Math.min(clock.getDelta(),0.04);
+
+  if(!gameOver){
+    if(keys.left)player.position.x-=5*dt;
+    if(keys.right)player.position.x+=5*dt;
+    if(keys.forward)player.position.z-=5*dt;
+    if(keys.back)player.position.z+=5*dt;
+
+    player.position.x=THREE.MathUtils.clamp(player.position.x,-3.5,3.5);
+    player.position.z=THREE.MathUtils.clamp(player.position.z,-100,8);
+
+    vy-=18*dt;
+    player.position.y+=vy*dt;
+    if(player.position.y<=0){
+      player.position.y=0;vy=0;onGround=true;
+    }
+
+    attacking=Math.max(0,attacking-dt);
+    limbs[0].rotation.x=attacking? -1.5:Math.sin(clock.elapsedTime*8)*0.25;
+    limbs[1].rotation.x=attacking? -0.8:Math.sin(clock.elapsedTime*8+1)*0.25;
+
+    for(const coin of coins){
+      coin.rotation.y+=2*dt;
+      coin.rotation.x+=0.6*dt;
+      if(coin.visible&&coin.position.distanceTo(player.position)<1.25){
+        coin.visible=false;score+=1;
+        document.getElementById("score").textContent=score;
+        playSound(750,0.1);
+      }
+    }
+
+    for(const en of enemies){
+      if(!en.alive)continue;
+      en.hitCooldown-=dt;
+      const dx=player.position.x-en.mesh.position.x;
+      const dz=player.position.z-en.mesh.position.z;
+      const dist=Math.sqrt(dx*dx+dz*dz);
+      if(dist<12&&dist>1.25){
+        en.mesh.position.x+=dx/dist*1.0*dt;
+        en.mesh.position.z+=dz/dist*1.0*dt;
+      }else if(dist<=1.25&&en.hitCooldown<=0){
+        health=Math.max(0,health-10);
+        document.getElementById("health").textContent=health;
+        en.hitCooldown=1.2;
+        if(health<=0)endGame();
+      }
+    }
+
+    document.getElementById("message").textContent=
+      "Collect coins 🪙 • Defeat enemies ⚔️";
+  }
+
+  camera.position.set(
+    player.position.x*0.45,
+    player.position.y+4.3,
+    player.position.z+8.5
+  );
+  camera.lookAt(
+    player.position.x,
+    player.position.y+1,
+    player.position.z-3
+  );
+  renderer.render(scene,camera);
+}
+addEventListener("resize",()=>{
+  camera.aspect=innerWidth/innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth,innerHeight);
+});
+animate();
 </script>
 </body>
 </html>
-
